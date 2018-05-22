@@ -55,11 +55,6 @@ def main(args):
     if args.anneal and epoch >= args.anneal_start:
       sess.run(model.lr_decay_op)
 
-    # if epoch % 1 == 0:
-    #   x_batch, y_batch = mnist.test.next_batch(100)
-    #   embed, k = model.debug(x_batch)
-    #   np.savetxt(os.path.join(img_dir, "k%s.txt" % epoch), k.reshape(args.batch_size, 16), fmt='%d',delimiter=',')
-
     if epoch % args.save_epoch == 0:
       x_batch, y_batch = mnist.test.next_batch(100)
       x_recon = model.reconstruct(x_batch)
