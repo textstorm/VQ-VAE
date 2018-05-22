@@ -6,7 +6,7 @@ import config
 import time
 import os
 
-from model import AVB
+from model import VQVAE
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def main(args):
@@ -28,7 +28,7 @@ def main(args):
   config_proto = utils.get_config_proto()
 
   sess = tf.Session(config=config_proto)
-  model = AVB(args, sess, name="avb")
+  model = VQVAE(args, sess, name="vqvae")
 
   total_batch = mnist.train.num_examples // args.batch_size
 
@@ -41,14 +41,12 @@ def main(args):
       global_step = sess.run(model.global_step)
       x_batch, y_batch = mnist.train.next_batch(args.batch_size)
 
-      _, vae_loss, rec_loss, global_step, summaries = model.train_vae(x_batch)
-      summary_writer.add_summary(summaries, global_step)
-      _, adv_loss, global_step, summaries = model.train_adv(x_batch)
+      _, loss, rec_loss, vq, commit, global_step, summaries = model.train(x_batch)
       summary_writer.add_summary(summaries, global_step)
 
       if i % args.print_step == 0:
-        print "epoch %d, step %d, vae_loss %f, rec_loss %f, adv_loss %f, time %.2fs" \
-            % (epoch, global_step, vae_loss, rec_loss, adv_loss, time.time()-step_start_time)
+        print "epoch %d, step %d, loss %f, rec_loss %f, vq_loss %f, commit_loss %f, time %.2fs" \
+            % (epoch, global_step, loss, rec_loss, vq, commit, time.time()-step_start_time)
         step_start_time = time.time()
 
     if epoch % 50 == 0:
@@ -57,10 +55,16 @@ def main(args):
     if args.anneal and epoch >= args.anneal_start:
       sess.run(model.lr_decay_op)
 
+    # if epoch % 1 == 0:
+    #   x_batch, y_batch = mnist.test.next_batch(100)
+    #   embed, k = model.debug(x_batch)
+    #   np.savetxt(os.path.join(img_dir, "k%s.txt" % epoch), k.reshape(args.batch_size, 16), fmt='%d',delimiter=',')
+
     if epoch % args.save_epoch == 0:
-      z = np.random.normal(size=[100, args.latent_dim])
-      gen_images = np.reshape(model.generate(z, 100), (100, 28, 28, 1))
-      utils.save_images(gen_images, [10, 10], os.path.join(img_dir, "sample%s.jpg" % epoch))
+      x_batch, y_batch = mnist.test.next_batch(100)
+      x_recon = model.reconstruct(x_batch)
+      utils.save_images(x_batch.reshape(-1, 28, 28, 1), [10, 10], os.path.join(img_dir, "rawImage%s.jpg" % epoch))
+      utils.save_images(x_recon, [10, 10], os.path.join(img_dir, "reconstruct%s.jpg" % epoch))
 
   model.saver.save(sess, os.path.join(save_dir, "model.ckpt"))
   print "Model stored...."
