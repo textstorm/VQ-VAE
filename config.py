@@ -9,7 +9,7 @@ def get_args():
 
   parser.add_argument('--random_seed', type=int, default=827, help='Random seed')
 
-  parser.add_argument('--train_dir', type=str, default='../data', help='data path')
+  parser.add_argument('--train_dir', type=str, default='../data/MNIST', help='data path')
   parser.add_argument('--log_dir', type=str, default='save/logs', help='log path')
   parser.add_argument('--save_dir', type=str, default='save/saves', help='save path')
   parser.add_argument('--img_dir', type=str, default='save/imgs', help='save path')
