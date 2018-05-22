@@ -71,18 +71,27 @@ class VQVAE(object):
     x = tf.layers.conv2d(x, self.D//4, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer1')
     x = tf.layers.conv2d(x, self.D//2, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer2')
     x = tf.layers.conv2d(x, self.D, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer3')
+    x = self.residual(x, "res_layer1")
+    x = self.residual(x, "res_layer2")
     return x
 
   def decoder(self, z):
     s = float(self.output_width)
     s2, s4, s8 = int(np.ceil(s/2)), int(np.ceil(s/4)), int(np.ceil(s/8))
-    x = tf.nn.relu(self.deconv2d(z, 4, self.D, self.D//2, 2, [self.batch_size, s4, s4, self.D//2], name='de_layer1'))
+    x = self.residual(z, "res_layer1")
+    x = self.residual(x, "res_layer2")
+    x = tf.nn.relu(self.deconv2d(x, 4, self.D, self.D//2, 2, [self.batch_size, s4, s4, self.D//2], name='de_layer1'))
     x = tf.nn.relu(self.deconv2d(x, 4, self.D//2, self.D//4, 2, [self.batch_size, s2, s2, self.D//4], name='de_layer2'))
     x = self.deconv2d(x, 4, self.D//4, 1, 2, 
         [self.batch_size, self.output_width, self.output_width, self.input_channel], name='de_layer3')
     x_logits = tf.reshape(x, [-1, self.input_size])
     x_recons = tf.nn.sigmoid(x)
     return x_logits, x_recons    
+
+  def residual(self, x, name):
+    conv1 = tf.layers.conv2d(x, self.D, (3, 3), (1, 1), activation=tf.nn.relu, padding='same', name="%s_1" % name)
+    conv2 = tf.layers.conv2d(conv1, self.D, (1, 1), (1, 1), activation=None, padding='same', name="%s_2" % name)
+    return tf.nn.relu(conv2 + x)
 
   def reconstruct(self, x_images):
     feed_dict = {self.x_images: x_images}
