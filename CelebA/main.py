@@ -32,7 +32,7 @@ def main(args):
 
   img_paths = glob.glob('./data/img_align_celeba/*.jpg')
   celeba = utils.DiskImageData(sess, img_paths, args.batch_size, shape=[218, 178, 3])
-  total_batch = mnist.train.num_examples // args.batch_size
+  total_batch = celeba.num_examples // args.batch_size
 
   for epoch in range(1, args.nb_epoch + 1):
     print "Epoch %d start with learning rate %f" % (epoch, model.learning_rate.eval(sess))
