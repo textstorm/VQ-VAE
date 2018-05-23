@@ -61,3 +61,10 @@ class DiskImageData:
   @property
   def num_examples(self):
     return self._num_examples
+
+def get_config_proto(log_device_placement=False, allow_soft_placement=True):
+  config_proto = tf.ConfigProto(
+      log_device_placement=log_device_placement,
+      allow_soft_placement=allow_soft_placement)
+  config_proto.gpu_options.allow_growth = True
+  return config_proto
