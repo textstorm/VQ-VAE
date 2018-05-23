@@ -41,7 +41,7 @@ def main(args):
     step_start_time = epoch_start_time
     for i in range(1, total_batch + 1):
       global_step = sess.run(model.global_step)
-      x_batch, y_batch = celeba.next_batch(args.batch_size)
+      x_batch, y_batch = celeba.next_batch()
 
       _, loss, rec_loss, vq, commit, global_step, summaries = model.train(x_batch)
       summary_writer.add_summary(summaries, global_step)
