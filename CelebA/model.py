@@ -16,7 +16,7 @@ class VQVAE(object):
     self.global_step = tf.Variable(0, trainable=False)
 
     with tf.name_scope("data"):
-      self.x_images = tf.placeholder(tf.float32, [None, self.input_size])
+      self.x_images = tf.placeholder(tf.float32, [None] + self.input_size)
 
     self.batch_size = tf.shape(self.x_images)[0]
     with tf.name_scope("vqvae"):
@@ -35,8 +35,9 @@ class VQVAE(object):
         x_logits, self.x_recons = self.decoder(z_q)
 
     with tf.name_scope("loss"):
-      self.rec_loss = tf.reduce_mean(tf.reduce_sum(
-          tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logits, labels=self.x_images), 1))
+      # self.rec_loss = tf.reduce_mean(tf.reduce_sum(
+      #       tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logits, labels=self.x_images), axis=[1,2,3]))
+      self.rec_loss = tf.reduce_mean(tf.reduce_sum((self.x_images - self.x_recons)**2, axis=[1, 2, 3]))
       self.vq = tf.reduce_mean(tf.norm(tf.stop_gradient(self.z_e) - z_q, axis=-1)**2, axis=[0,1,2])
       self.commit = tf.reduce_mean(tf.norm(self.z_e - tf.stop_gradient(z_q), axis=-1)**2, axis=[0,1,2])
       self.loss = self.rec_loss + self.vq + self.beta * self.commit
@@ -67,10 +68,9 @@ class VQVAE(object):
     self.saver = tf.train.Saver(tf.global_variables())    
 
   def encoder(self, x_images):
-    x = tf.reshape(x_images, [-1, self.output_width, self.output_width, self.input_channel])
-    x = tf.layers.conv2d(x, self.D//4, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer1')
-    x = tf.layers.conv2d(x, self.D//2, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer2')
-    x = tf.layers.conv2d(x, self.D, (4, 4), (2, 2), activation=tf.nn.relu, padding='same', name='en_layer3')
+    x = tf.layers.conv2d(x_images, self.D//2, (4, 4), (2, 2), activation=tf.nn.leaky_relu, padding='same', name='en_layer1')
+    x = tf.layers.conv2d(x, self.D//2, (4, 4), (2, 2), activation=tf.nn.leaky_relu, padding='same', name='en_layer2')
+    x = tf.layers.conv2d(x, self.D, (4, 4), (2, 2), activation=tf.nn.leaky_relu, padding='same', name='en_layer3')
     x = self.residual(x, "res_layer1")
     x = self.residual(x, "res_layer2")
     return x
@@ -81,17 +81,16 @@ class VQVAE(object):
     x = self.residual(z, "res_layer1")
     x = self.residual(x, "res_layer2")
     x = tf.nn.relu(self.deconv2d(x, 4, self.D, self.D//2, 2, [self.batch_size, s4, s4, self.D//2], name='de_layer1'))
-    x = tf.nn.relu(self.deconv2d(x, 4, self.D//2, self.D//4, 2, [self.batch_size, s2, s2, self.D//4], name='de_layer2'))
-    x = self.deconv2d(x, 4, self.D//4, 1, 2, 
+    x = tf.nn.relu(self.deconv2d(x, 4, self.D//2, self.D//2, 2, [self.batch_size, s2, s2, self.D//2], name='de_layer2'))
+    x = self.deconv2d(x, 4, self.D//2, self.input_channel, 2, 
         [self.batch_size, self.output_width, self.output_width, self.input_channel], name='de_layer3')
-    x_logits = tf.reshape(x, [-1, self.input_size])
-    x_recons = tf.nn.sigmoid(x)
-    return x_logits, x_recons    
+    x_recons = tf.nn.tanh(x)
+    return x, x_recons    
 
   def residual(self, x, name):
-    conv1 = tf.layers.conv2d(x, self.D, (3, 3), (1, 1), activation=tf.nn.relu, padding='same', name="%s_1" % name)
+    conv1 = tf.layers.conv2d(x, self.D, (3, 3), (1, 1), activation=tf.nn.leaky_relu, padding='same', name="%s_1" % name)
     conv2 = tf.layers.conv2d(conv1, self.D, (1, 1), (1, 1), activation=None, padding='same', name="%s_2" % name)
-    return tf.nn.relu(conv2 + x)
+    return tf.nn.leaky_relu(conv2 + x)
 
   def reconstruct(self, x_images):
     feed_dict = {self.x_images: x_images}
