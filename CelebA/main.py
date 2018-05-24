@@ -8,6 +8,7 @@ import time
 import os
 
 from model import VQVAE
+from sklearn.model_selection import train_test_split
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def main(args):
@@ -30,8 +31,9 @@ def main(args):
   sess = tf.Session(config=config_proto)
   model = VQVAE(args, sess, name="vqvae")
 
-  img_paths = glob.glob('./data/img_align_celeba/*.jpg')
-  celeba = utils.DiskImageData(sess, img_paths, args.batch_size, shape=[218, 178, 3])
+  img_paths = glob.glob('data/img_align_celeba/*.jpg')
+  train_paths, test_paths = train_test_split(img_paths, test_size=0.1, random_state=args.random_seed)
+  celeba = utils.DiskImageData(sess, train_paths, args.batch_size, shape=[218, 178, 3])
   total_batch = celeba.num_examples // args.batch_size
 
   for epoch in range(1, args.nb_epoch + 1):
@@ -51,16 +53,13 @@ def main(args):
             % (epoch, global_step, loss, rec_loss, vq, commit, time.time()-step_start_time)
         step_start_time = time.time()
 
-    if epoch % 50 == 0:
-      print "- " * 5
-
     if args.anneal and epoch >= args.anneal_start:
       sess.run(model.lr_decay_op)
 
     if epoch % args.save_epoch == 0:
-      x_batch, y_batch = mnist.test.next_batch(100)
+      x_batch = celeba.next_batch()
       x_recon = model.reconstruct(x_batch)
-      utils.save_images(x_batch.reshape(-1, 28, 28, 1), [10, 10], os.path.join(img_dir, "rawImage%s.jpg" % epoch))
+      utils.save_images(x_batch, [10, 10], os.path.join(img_dir, "rawImage%s.jpg" % epoch))
       utils.save_images(x_recon, [10, 10], os.path.join(img_dir, "reconstruct%s.jpg" % epoch))
 
   model.saver.save(sess, os.path.join(save_dir, "model.ckpt"))
